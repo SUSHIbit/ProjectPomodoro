@@ -57,21 +57,21 @@
             <div class="bg-white bg-opacity-20 backdrop-blur-md rounded-lg p-6 shadow-lg">
                 <h2 class="text-xl font-semibold text-white mb-4">Music Player</h2>
                 
-                @auth
-                    <div class="mb-4">
-                        <div class="text-white mb-2">
-                            <span class="font-medium">Now Playing: </span>
-                            <span x-text="currentSong ? currentSong.title : 'No song selected'"></span>
-                        </div>
-                        
-                        <audio id="audioPlayer" class="w-full" controls @ended="songEnded">
-                            <source src="" type="audio/mpeg">
-                            Your browser does not support the audio element.
-                        </audio>
+                <div class="mb-4">
+                    <div class="text-white mb-2">
+                        <span class="font-medium">Now Playing: </span>
+                        <span x-text="currentSong ? currentSong.title : 'No song selected'"></span>
                     </div>
                     
-                    <div class="max-h-60 overflow-y-auto">
-                        <h3 class="text-white text-sm font-medium mb-2">Song List</h3>
+                    <audio id="audioPlayer" class="w-full" controls @ended="songEnded">
+                        <source src="" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+                
+                <div class="max-h-60 overflow-y-auto">
+                    <h3 class="text-white text-sm font-medium mb-2">Song List</h3>
+                    @if(count($songs) > 0)
                         <ul class="space-y-2">
                             @foreach($songs as $song)
                                 <li>
@@ -91,15 +91,10 @@
                                 </li>
                             @endforeach
                         </ul>
-                    </div>
-                @else
-                    <div class="text-white text-center py-4">
-                        <p class="mb-4">Please log in to access the music player</p>
-                        <a href="{{ route('login') }}" class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md">
-                            Log In
-                        </a>
-                    </div>
-                @endauth
+                    @else
+                        <p class="text-white text-center">No songs available</p>
+                    @endif
+                </div>
             </div>
         </div>
         
@@ -119,6 +114,9 @@
                 <div class="flex justify-end">
                     <a href="{{ route('login') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md mr-3">
                         Log In
+                    </a>
+                    <a href="{{ route('register') }}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md mr-3">
+                        Register
                     </a>
                     <button @click="showLoginModal = false" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-md">
                         Close
@@ -178,13 +176,21 @@
                 },
                 
                 pauseTimer() {
+                    @auth
                     this.isRunning = false;
                     clearInterval(this.timer);
+                    @else
+                    this.showLoginModal = true;
+                    @endauth
                 },
                 
                 resetTimer() {
+                    @auth
                     this.pauseTimer();
                     this.setMode(this.currentMode);
+                    @else
+                    this.setMode(this.currentMode);
+                    @endauth
                 },
                 
                 updateTimer() {
@@ -217,8 +223,10 @@
                         this.setMode('Focus');
                     }
                     
-                    // Auto-start next timer
+                    // Auto-start next timer if authenticated
+                    @auth
                     this.startTimer();
+                    @endauth
                 },
                 
                 setMode(mode) {

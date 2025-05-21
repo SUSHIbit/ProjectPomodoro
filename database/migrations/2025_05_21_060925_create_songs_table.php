@@ -14,12 +14,23 @@ return new class extends Migration
         Schema::create('songs', function (Blueprint $table) {
             $table->id();
             $table->string('title');
-            $table->foreignId('genre_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('wallpaper_id')->nullable()->constrained()->nullOnDelete();
+            $table->unsignedBigInteger('genre_id')->nullable();
+            $table->unsignedBigInteger('wallpaper_id')->nullable();
             $table->string('file_path');
             $table->timestamps();
         });
+        
+        // Add the foreign keys after all tables are created
+        Schema::table('songs', function (Blueprint $table) {
+            if (Schema::hasTable('genres')) {
+                $table->foreign('genre_id')->references('id')->on('genres')->nullOnDelete();
+            }
+            if (Schema::hasTable('wallpapers')) {
+                $table->foreign('wallpaper_id')->references('id')->on('wallpapers')->nullOnDelete();
+            }
+        });
     }
+    
     /**
      * Reverse the migrations.
      */
