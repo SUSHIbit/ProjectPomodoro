@@ -26,7 +26,7 @@
             
             // Initialize the app
             initApp() {
-                console.log('Initializing premium Pomodoro Music app...');
+                console.log('Initializing Pomodoro Music app...');
                 
                 this.resetTimer();
                 this.audioPlayer = document.getElementById('audioPlayer');
@@ -36,7 +36,7 @@
                 this.requestNotificationPermission();
             },
             
-            // Load user settings from localStorage
+            // Load user settings
             loadSettings() {
                 try {
                     const savedVolume = localStorage.getItem('pomodoroVolume');
@@ -56,13 +56,13 @@
                         this.focusCount = parseInt(savedFocusCount);
                     }
                     
-                    console.log('Settings loaded:', { volume: this.volume, muted: this.isMuted, focusCount: this.focusCount });
+                    console.log('Settings loaded');
                 } catch (error) {
                     console.warn('Could not load settings:', error);
                 }
             },
             
-            // Save user settings to localStorage
+            // Save user settings
             saveSettings() {
                 try {
                     localStorage.setItem('pomodoroVolume', this.volume.toString());
@@ -89,7 +89,6 @@
                     console.log('Songs loaded:', this.allSongs.length, 'songs');
                     
                     if (this.allSongs.length > 0) {
-                        // Set first song as current but don't play it
                         this.currentSong = this.allSongs[0];
                         this.currentWallpaper = this.currentSong.wallpaper || '';
                         
@@ -112,45 +111,53 @@
                     return;
                 }
                 
-                this.audioPlayer.addEventListener('play', () => {
+                // Clear any existing event listeners
+                this.audioPlayer.removeEventListener('play', this.handlePlay);
+                this.audioPlayer.removeEventListener('pause', this.handlePause);
+                this.audioPlayer.removeEventListener('ended', this.handleEnded);
+                this.audioPlayer.removeEventListener('loadedmetadata', this.handleLoadedMetadata);
+                this.audioPlayer.removeEventListener('timeupdate', this.handleTimeUpdate);
+                this.audioPlayer.removeEventListener('error', this.handleError);
+                
+                // Add event listeners
+                this.handlePlay = () => {
                     this.isPlaying = true;
                     this.startPlaybackTracking();
                     console.log('Audio started playing');
-                });
+                };
                 
-                this.audioPlayer.addEventListener('pause', () => {
+                this.handlePause = () => {
                     this.isPlaying = false;
                     this.stopPlaybackTracking();
                     console.log('Audio paused');
-                });
+                };
                 
-                this.audioPlayer.addEventListener('ended', () => {
+                this.handleEnded = () => {
                     console.log('Audio ended, playing next song');
                     this.playNextSong();
-                });
+                };
                 
-                this.audioPlayer.addEventListener('loadedmetadata', () => {
+                this.handleLoadedMetadata = () => {
                     this.updateTotalDuration();
                     console.log('Audio metadata loaded');
-                });
+                };
                 
-                this.audioPlayer.addEventListener('timeupdate', () => {
+                this.handleTimeUpdate = () => {
                     this.updatePlaybackTime();
-                });
+                };
                 
-                this.audioPlayer.addEventListener('error', (e) => {
+                this.handleError = (e) => {
                     console.error('Audio error:', e);
                     this.isPlaying = false;
                     this.stopPlaybackTracking();
-                });
+                };
                 
-                this.audioPlayer.addEventListener('loadstart', () => {
-                    console.log('Audio loading started');
-                });
-                
-                this.audioPlayer.addEventListener('canplay', () => {
-                    console.log('Audio can play');
-                });
+                this.audioPlayer.addEventListener('play', this.handlePlay);
+                this.audioPlayer.addEventListener('pause', this.handlePause);
+                this.audioPlayer.addEventListener('ended', this.handleEnded);
+                this.audioPlayer.addEventListener('loadedmetadata', this.handleLoadedMetadata);
+                this.audioPlayer.addEventListener('timeupdate', this.handleTimeUpdate);
+                this.audioPlayer.addEventListener('error', this.handleError);
             },
             
             // Music Player Methods
@@ -163,17 +170,18 @@
                 if (this.isPlaying) {
                     this.audioPlayer.pause();
                 } else {
-                    // If no song is selected, play the first one
                     if (!this.currentSong && this.allSongs.length > 0) {
                         this.playSong(this.allSongs[0]);
                         return;
                     }
                     
-                    // Play current song
-                    this.audioPlayer.play().catch(error => {
-                        console.error('Error playing audio:', error);
-                        this.isPlaying = false;
-                    });
+                    const playPromise = this.audioPlayer.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.error('Error playing audio:', error);
+                            this.isPlaying = false;
+                        });
+                    }
                 }
             },
             
@@ -185,19 +193,39 @@
                 
                 console.log('Playing song:', song.title);
                 
+                // Stop current playback
+                this.audioPlayer.pause();
+                this.audioPlayer.currentTime = 0;
+                
+                // Update current song
                 this.currentSong = song;
                 this.currentWallpaper = song.wallpaper || '';
                 
-                // Update audio source and settings
+                // Reset progress
+                this.progressPercent = 0;
+                this.currentPlaybackTime = '0:00';
+                this.totalDuration = '0:00';
+                
+                // Set new source
                 this.audioPlayer.src = song.file_path;
                 this.audioPlayer.volume = this.isMuted ? 0 : this.volume;
+                
+                // Load and play
                 this.audioPlayer.load();
                 
-                // Play the song
-                this.audioPlayer.play().catch(error => {
-                    console.error('Error playing song:', error);
-                    this.isPlaying = false;
-                });
+                // Wait for canplay event before playing
+                const playWhenReady = () => {
+                    this.audioPlayer.removeEventListener('canplay', playWhenReady);
+                    const playPromise = this.audioPlayer.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.error('Error playing song:', error);
+                            this.isPlaying = false;
+                        });
+                    }
+                };
+                
+                this.audioPlayer.addEventListener('canplay', playWhenReady, { once: true });
             },
             
             playNextSong() {
@@ -235,33 +263,28 @@
             // Volume Controls
             setVolume(value) {
                 const newVolume = parseFloat(value);
-                this.volume = Math.max(0, Math.min(1, newVolume)); // Clamp between 0 and 1
+                this.volume = Math.max(0, Math.min(1, newVolume));
                 
                 if (this.audioPlayer) {
                     this.audioPlayer.volume = this.isMuted ? 0 : this.volume;
                 }
                 
-                // If volume is set to 0, consider it muted
-                if (this.volume === 0) {
+                if (this.volume === 0 && !this.isMuted) {
                     this.isMuted = true;
-                } else if (this.isMuted && this.volume > 0) {
+                } else if (this.volume > 0 && this.isMuted) {
                     this.isMuted = false;
                 }
                 
                 this.saveSettings();
-                console.log('Volume set to:', this.volume);
             },
             
             toggleMute() {
                 if (this.isMuted) {
-                    // Unmute
                     this.isMuted = false;
                     this.volume = this.previousVolume > 0 ? this.previousVolume : 0.7;
                 } else {
-                    // Mute
                     this.isMuted = true;
                     this.previousVolume = this.volume;
-                    this.volume = 0;
                 }
                 
                 if (this.audioPlayer) {
@@ -269,12 +292,12 @@
                 }
                 
                 this.saveSettings();
-                console.log('Mute toggled:', this.isMuted ? 'ON' : 'OFF');
             },
             
-            // Seek functionality
+            // Fixed seek functionality
             seekTo(event) {
                 if (!this.audioPlayer || !this.audioPlayer.duration || isNaN(this.audioPlayer.duration)) {
+                    console.warn('Cannot seek: audio not ready');
                     return;
                 }
                 
@@ -283,7 +306,9 @@
                 const seekTime = percent * this.audioPlayer.duration;
                 
                 this.audioPlayer.currentTime = seekTime;
-                console.log('Seeked to:', seekTime, 'seconds');
+                this.updatePlaybackTime();
+                
+                console.log('Seeked to:', Math.floor(seekTime), 'seconds');
             },
             
             // Playback tracking
@@ -291,7 +316,7 @@
                 this.stopPlaybackTracking();
                 this.updateInterval = setInterval(() => {
                     this.updatePlaybackTime();
-                }, 1000);
+                }, 100); // Update every 100ms for smooth progress
             },
             
             stopPlaybackTracking() {
@@ -302,10 +327,12 @@
             },
             
             updatePlaybackTime() {
-                if (!this.audioPlayer) return;
+                if (!this.audioPlayer || !this.audioPlayer.duration || isNaN(this.audioPlayer.duration)) {
+                    return;
+                }
                 
                 const currentTime = this.audioPlayer.currentTime || 0;
-                const duration = this.audioPlayer.duration || 1;
+                const duration = this.audioPlayer.duration;
                 
                 // Update current time display
                 const minutes = Math.floor(currentTime / 60);
@@ -313,7 +340,7 @@
                 this.currentPlaybackTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
                 
                 // Update progress percentage
-                this.progressPercent = (currentTime / duration) * 100;
+                this.progressPercent = Math.min(100, (currentTime / duration) * 100);
             },
             
             updateTotalDuration() {
@@ -383,13 +410,9 @@
                 this.pauseTimer();
                 console.log('Timer completed for mode:', this.currentMode);
                 
-                // Play notification sound
                 this.playNotificationSound();
-                
-                // Show browser notification
                 this.showBrowserNotification();
                 
-                // Switch mode and update focus count
                 const previousMode = this.currentMode;
                 if (this.currentMode === 'Focus') {
                     this.focusCount++;
@@ -398,27 +421,19 @@
                     this.setMode('Focus');
                 }
                 
-                // Save progress
                 this.saveSettings();
                 
-                // Auto-start next session after 3 seconds
                 setTimeout(() => {
-                    if (!this.isRunning) { // Only start if user hasn't manually started
+                    if (!this.isRunning) {
                         this.startTimer();
                     }
                 }, 3000);
-                
-                console.log(`Switched from ${previousMode} to ${this.currentMode}`);
             },
             
             playNotificationSound() {
                 try {
-                    // Create audio context for notification beep
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if (!AudioContext) {
-                        console.warn('Web Audio API not supported');
-                        return;
-                    }
+                    if (!AudioContext) return;
                     
                     const audioContext = new AudioContext();
                     const oscillator = audioContext.createOscillator();
@@ -427,7 +442,6 @@
                     oscillator.connect(gainNode);
                     gainNode.connect(audioContext.destination);
                     
-                    // Create a pleasant notification sound
                     oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
                     oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
                     oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
@@ -451,25 +465,15 @@
                     const notification = new Notification('Pomodoro Timer', {
                         body: `${this.currentMode} session completed! 🎉`,
                         icon: '/favicon.ico',
-                        badge: '/favicon.ico',
                         tag: 'pomodoro-timer',
-                        requireInteraction: false,
-                        actions: [
-                            {
-                                action: 'start',
-                                title: 'Start Next Session'
-                            }
-                        ]
+                        requireInteraction: false
                     });
                     
-                    // Auto-close notification after 5 seconds
                     setTimeout(() => {
                         notification.close();
                     }, 5000);
                     
                     console.log('Browser notification shown');
-                } else {
-                    console.warn('Notifications not available or not permitted');
                 }
             },
             
@@ -482,7 +486,6 @@
                 
                 this.currentMode = mode;
                 
-                // Set timer duration based on mode
                 switch (mode) {
                     case 'Focus':
                         this.minutes = 25;
@@ -505,19 +508,6 @@
                 return Math.max(0, Math.floor(time)).toString().padStart(2, '0');
             },
             
-            // Utility methods
-            getProgressPercent() {
-                return this.timerProgressPercent;
-            },
-            
-            getCurrentSongTitle() {
-                return this.currentSong ? this.currentSong.title : 'No song selected';
-            },
-            
-            getCurrentSongGenre() {
-                return this.currentSong ? (this.currentSong.genre || 'Unknown') : 'Select a song';
-            },
-            
             // Cleanup method
             destroy() {
                 this.pauseTimer();
@@ -529,80 +519,42 @@
                 }
                 
                 this.saveSettings();
-                console.log('Pomodoro app destroyed');
             }
         }));
     });
     
     // Global event listeners
     document.addEventListener('DOMContentLoaded', function() {
-        // Request notification permission on load
         if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission().then(permission => {
-                console.log('Notification permission granted:', permission === 'granted');
-            });
+            Notification.requestPermission();
         }
         
-        // Handle visibility change to pause/resume timer
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                console.log('Page hidden');
-            } else {
-                console.log('Page visible');
-            }
-        });
-        
-        // Handle before unload to save settings
-        window.addEventListener('beforeunload', function() {
-            // Settings are automatically saved throughout the app
-            console.log('Page unloading');
-        });
-        
-        // Handle keyboard shortcuts
+        // Keyboard shortcuts
         document.addEventListener('keydown', function(event) {
-            // Only handle shortcuts when not in an input field
             if (event.target.tagName.toLowerCase() === 'input' || 
                 event.target.tagName.toLowerCase() === 'textarea') {
                 return;
             }
             
+            const app = Alpine.$data(document.querySelector('[x-data="pomodoroApp()"]'));
+            if (!app) return;
+            
             // Space bar to toggle play/pause
             if (event.code === 'Space') {
                 event.preventDefault();
-                const app = Alpine.$data(document.querySelector('[x-data="pomodoroApp()"]'));
-                if (app) {
-                    app.togglePlayPause();
-                }
+                app.togglePlayPause();
             }
             
             // Arrow keys for previous/next song
             if (event.code === 'ArrowLeft') {
                 event.preventDefault();
-                const app = Alpine.$data(document.querySelector('[x-data="pomodoroApp()"]'));
-                if (app) {
-                    app.playPrevSong();
-                }
+                app.playPrevSong();
             }
             
             if (event.code === 'ArrowRight') {
                 event.preventDefault();
-                const app = Alpine.$data(document.querySelector('[x-data="pomodoroApp()"]'));
-                if (app) {
-                    app.playNextSong();
-                }
+                app.playNextSong();
             }
         });
     });
-    
-    // Service Worker registration for offline support (optional)
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-            // Uncomment if you want to add offline support
-            // navigator.serviceWorker.register('/sw.js').then(function(registration) {
-            //     console.log('ServiceWorker registration successful');
-            // }).catch(function(err) {
-            //     console.log('ServiceWorker registration failed');
-            // });
-        });
-    }
 </script>

@@ -53,10 +53,10 @@
             <!-- User Profile Component -->
             @include('components.user-profile')
             
-            <!-- Pomodoro Timer Component -->
+            <!-- Pomodoro Timer Component (Center and Bigger) -->
             @include('components.pomodoro-timer')
             
-            <!-- Music Player Component -->
+            <!-- Music Player Component (Bottom Left) -->
             @include('components.music-player')
         </div>
         
@@ -143,6 +143,28 @@
                 left: 10%;
                 animation: float 5s ease-in-out infinite, fadeInOut 4s ease-in-out infinite;
                 animation-delay: 3s;
+            }
+            
+            /* Custom slider styles */
+            .slider::-webkit-slider-thumb {
+                appearance: none;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #6366f1, #8b5cf6);
+                cursor: pointer;
+                border: 2px solid white;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            }
+
+            .slider::-moz-range-thumb {
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #6366f1, #8b5cf6);
+                cursor: pointer;
+                border: 2px solid white;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             }
             
             /* Smooth transitions for all interactive elements */
